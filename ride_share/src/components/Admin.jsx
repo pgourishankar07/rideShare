@@ -86,7 +86,7 @@ const Admin = () => {
           <Typography variant="body2" align="center" color={"black"}>
             {/* eslint-disable-next-line react/no-unescaped-entities */}
             Don't have an account?{" "}
-            <Link href="/register" variant="body2">
+            <Link to="/register" variant="body2">
               Register here
             </Link>
           </Typography>

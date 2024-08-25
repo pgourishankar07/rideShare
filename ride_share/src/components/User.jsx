@@ -8,6 +8,7 @@ import {
   Avatar,
 } from "@mui/material";
 import PersonIcon from "@mui/icons-material/Person";
+import { Link } from "react-router-dom";
 
 const User = () => {
   const [email, setEmail] = useState("");
@@ -68,6 +69,20 @@ const User = () => {
           >
             LogIn
           </Button>
+          <Typography variant="body2" align="center" color={"black"}>
+            {/* eslint-disable-next-line react/no-unescaped-entities */}
+            Don't have an account?{" "}
+            <Link to="/register?role=rider" variant="body2">
+              Register as Rider
+            </Link>
+          </Typography>
+          <Typography variant="body2" align="center" color={"black"}>
+            {/* eslint-disable-next-line react/no-unescaped-entities */}
+            Don't have an account?{" "}
+            <Link to="/register?role=driver" variant="body2">
+              Register as Driver
+            </Link>
+          </Typography>
         </Box>
       </Box>
     </Container>

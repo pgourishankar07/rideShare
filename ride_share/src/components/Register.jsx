@@ -12,19 +12,25 @@ import {
 } from "@mui/material";
 import AppRegistrationIcon from "@mui/icons-material/AppRegistration";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const Register = () => {
   const [data, setData] = useState({
     name: "",
     email: "",
     password: "",
+    cab_id: "",
+    dob: "",
+    location: "",
   });
 
   const [open, setOpen] = useState(false); // Snackbar open state
   const [message, setMessage] = useState(""); // Snackbar message
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const role = params.get("role");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -33,26 +39,77 @@ const Register = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    let token = null;
+    console.log("Before sending to register", data);
+
     axios
-      .post("http://localhost:9000/register", data)
+      .post(`http://localhost:9000/register`, data)
       .then((res) => {
-        const { token } = res.data;
+        console.log("Register", res.data.data._id);
+        token = res.data.token;
+        const _id = res.data.data._id;
+
+        setData((prevData) => ({
+          ...prevData,
+          _id: _id,
+        }));
+
         if (token) {
           localStorage.setItem("token", token);
           setMessage("Registration successful!");
-          setOpen(true); // Open Snackbar
-          setTimeout(() => {
-            navigate("/"); // Redirect to home page
-          }, 2000); // Redirect after 2 seconds to allow message display
-        } else {
-          setMessage("No token received.");
           setOpen(true);
+
+          // If successful, return a promise to chain the second request
+          console.log("Before Sending :", data);
+        } else {
+          throw new Error("No token received.");
         }
       })
-      .catch((error) => {
-        setMessage("There was an error sending the data!");
+      .then(() => {
+        return axios.post(`http://3.111.198.198:5000/getJWT`, data, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      })
+      .then((res) => {
+        console.log("Tanush: ", res.data.total_server_access_token);
+        console.log("Data: ", data);
+
+        if (role === "driver") {
+          return axios.post(
+            `http://3.111.198.198:5050/driver/addDriver`,
+            data,
+            {
+              headers: {
+                Authorization: `Bearer ${res.data.total_server_access_token}`,
+              },
+            }
+          );
+        } else {
+          // rider
+          return axios.post(`http://3.111.198.198:5050/rider/addRider`, data, {
+            headers: {
+              Authorization: `Bearer ${res.data.total_server_access_token}`,
+            },
+          });
+        }
+      })
+      .then((res) => {
+        console.log(res);
+        if (res) {
+          console.log("Driver added:", res.data);
+        }
+        // Delay navigation to allow the message to display
+        setTimeout(() => {
+          navigate("/");
+        }, 2000);
+      })
+      .catch((err) => {
+        console.error("Error during registration or driver addition:", err);
+        setMessage("Error occurred. Please try again.");
         setOpen(true);
-        console.log(error);
       });
   };
 
@@ -112,6 +169,49 @@ const Register = () => {
             value={data.password}
             onChange={handleChange}
           />
+          {role === "driver" && (
+            <>
+              <Box sx={{ mb: 2 }}>
+                <TextField
+                  margin="normal"
+                  required
+                  fullWidth
+                  id="cab_id"
+                  label="RC Book"
+                  name="cab_id"
+                  autoComplete="cab_id"
+                  value={data.cab_id}
+                  onChange={handleChange}
+                />
+              </Box>
+              <Box sx={{ mb: 2 }}>
+                <TextField
+                  margin="normal"
+                  required
+                  fullWidth
+                  id="dob"
+                  label="Date Of Birth"
+                  name="dob"
+                  autoComplete="dob"
+                  value={data.dob}
+                  onChange={handleChange}
+                />
+              </Box>
+              <Box sx={{ mb: 2 }}>
+                <TextField
+                  margin="normal"
+                  required
+                  fullWidth
+                  id="location"
+                  label="Location"
+                  name="location"
+                  autoComplete="loc"
+                  value={data.location}
+                  onChange={handleChange}
+                />
+              </Box>
+            </>
+          )}
           <Button
             type="submit"
             fullWidth

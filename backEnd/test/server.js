@@ -3,7 +3,7 @@ const express = require("express");
 const mongoose = require("mongoose"); // Import Mongoose
 const cors = require("cors");
 const jwt = require("jsonwebtoken"); // Import JSON Web Token
-
+const axios = require("axios");
 const app = express();
 
 app.use(cors());
@@ -12,9 +12,21 @@ app.use(express.json()); // To parse JSON data
 console.log();
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URL, {
+mongoose.connect(process.env.MONGO_URL1, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
+});
+
+const db = mongoose.connection;
+
+// Check for connection success
+db.on("connected", () => {
+  console.log("MongoDB connection established successfully");
+});
+
+// Check for connection error
+db.on("error", (error) => {
+  console.error("MongoDB connection error:", error);
 });
 
 // Define Mongoose schemas
@@ -81,11 +93,36 @@ app.post("/login", async (req, res) => {
         email: user.email,
         role: email.includes("@hexaware.admin") ? "admin" : "user",
       },
-      JWT_SECRET,
-      {
-        expiresIn: "1h", // Token expires in 1 hour
-      }
+      JWT_SECRET
     );
+
+    try {
+      const response = await axios.post(
+        "http://3.111.198.198:5000/getJWT",
+        requestData,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const apiToken = response.data; // Ensure this is the correct field you want from the response
+
+      console.log("API token received:", apiToken); // Log the response data
+
+      // Return both tokens to the client
+      res.status(201).json({ token, apiToken });
+    } catch (axiosError) {
+      console.error(
+        "Error fetching API token:",
+        axiosError.response?.data || axiosError.message
+      );
+      // You may choose to return a different response if fetching the API token fails
+      res
+        .status(500)
+        .json({ message: "User registered, but failed to fetch API token." });
+    }
 
     res.json({ user, token });
   } catch (err) {
@@ -95,18 +132,82 @@ app.post("/login", async (req, res) => {
 
 app.post("/register", async (req, res) => {
   const { name, email, password } = req.body;
+
+  let data = await User.findOne({ email });
+  console.log(data);
+
+  if (data) {
+    return res.status(403).json({ message: "User already registered" });
+  }
+
   let newUserOrAdmin;
+  let _id;
 
   if (email.includes("@hexaware.admin")) {
     newUserOrAdmin = new Admin({ name, email, password });
   } else if (email.includes("@hexaware.user")) {
     newUserOrAdmin = new User({ name, email, password });
+
+    // if (role == "driver") {
+    //   try {
+    //     const response = await axios.post(
+    //       "http://3.111.198.198:5000/getJWT",
+    //       requestData,
+    //       {
+    //         headers: {
+    //           "Content-Type": "application/json",
+    //         },
+    //       }
+    //     );
+
+    //     const apiToken = response.data; // Ensure this is the correct field you want from the response
+
+    //     console.log("API token received:", apiToken); // Log the response data
+
+    //     // Return both tokens to the client
+    //     res.status(201).json({ token, apiToken });
+    //   } catch (axiosError) {
+    //     console.error(
+    //       "Error fetching API token:",
+    //       axiosError.response?.data || axiosError.message
+    //     );
+    //     // You may choose to return a different response if fetching the API token fails
+    //     res
+    //       .status(500)
+    //       .json({ message: "User registered, but failed to fetch API token." });
+    //   }
+    //   try {
+    //     axios
+    //       .post("http://3.111.198.198:5050/driver/addDriver",data, {
+    //         headers: {
+    //           Authorization: `Bearer ${apiToken}`, // Use the new API token here
+    //         },
+    //       })
+    //       .then();
+    //   } catch (error) {
+    //     console.log(error);
+    //   }
+    // } else if (role == "rider") {
+    //   try {
+    //     axios
+    //       .post("http://3.111.198.198:5050/rider/addRider", {
+    //         headers: {
+    //           Authorization: `Bearer ${apiToken}`, // Use the new API token here
+    //         },
+    //       })
+    //       .then();
+    //   } catch (error) {
+    //     console.log(error);
+    //   }
+    // }
   } else {
     return res.status(400).json({ message: "Invalid email domain." });
   }
 
   try {
     await newUserOrAdmin.save();
+    data = await User.findOne({ email, password });
+    console.log(data);
 
     // Generate JWT token
     const token = jwt.sign(
@@ -114,12 +215,14 @@ app.post("/register", async (req, res) => {
         email: newUserOrAdmin.email,
         role: email.includes("@hexaware.admin") ? "admin" : "user",
       },
-      JWT_SECRET,
-      { expiresIn: "1h" } // Token expires in 1 hour
+      JWT_SECRET
     );
 
-    res.status(201).json({ token }); // Return the token
+    res.status(201).json({ token, data });
+
+    // Send a request to get another token (apiToken)
   } catch (err) {
+    console.error("Error registering user:", err.message);
     res.status(400).json({ message: err.message });
   }
 });
